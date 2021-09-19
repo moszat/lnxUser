@@ -7,7 +7,7 @@
  * @license GPL 3
  * @version 1.00
  * 
- * See the lnxUser.doc.html for the documentation. 
+ * See the https://doc.onlinesoft.org/index.php?title=LnxUser_PHP_Class_Reference for the documentation. 
  */
 
 define( 'LNX_PH_MD5',		'md5' );

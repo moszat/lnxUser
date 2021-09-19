@@ -20,19 +20,19 @@ $group	= 'testGroup';
 if ( ! lnxAddUser( [
 	
 	'name'			=> $user,		// Mantandory! Name of linux user.
-	'password'		=> 'HelloNSA',		// Mantandory! Password of linux user.
-	//'uid'			=> 1100,			// Optional. User ID of linux user. The ID must not exist!
-	//'gid'			=> 1100,			// Optional. Primary group of the linux user. The group must exist! If this parameter is not present the Group name will be the User name and the Group ID will be the User ID or the first free ID.
-	'groups'		=> [ 'users' ],		// Optional. Group membership of the linux user. It must be a simple indexed array what contains the groups in what the user will be member. The groups must exist.
-	//'nogroup'		=> true,			// Optional. If true the Primary group will not be created. If 'gid' is present this parameter will be ineffective.
-	'comment'		=> 'test user',		// Optional. Comment (display name) of linux user.
-	//'home'		=> '/home/test',	// Optional. Absolute path of Home directory of linux user.
-	//'createhome'	=> true,			// Optional. If false the Home directory will not be created.
-	//'shell'		=> '/bin/bash',		// Optional. Absolute path of shell for linux user.
-	//'inactive'	=> 90,				// Optional. The number of days after password expires that account is disabled.
-	//'expire'		=> 1640995199,		// Optional. Date when account will be disabled. Format: timestamp.
-	//'system'		=> true,			// Optional. If true create a system account. User ID will be under 1000. If 'uid' is present this parameter will be ineffective.
-	//'nonunique'	=> true	,			// Optional. If true allow to create users with duplicate (non-unique) User ID.
+	'password'		=> 'HelloNSA',	// Mantandory! Password of linux user.
+	//'uid'			=> 1100,		// Optional. User ID of linux user. The ID must not exist!
+	//'gid'			=> 1100,		// Optional. Primary group of the linux user. The group must exist! If this parameter is not present the Group name will be the User name and the Group ID will be the User ID or the first free ID.
+	'groups'		=> [ 'users' ],	// Optional. Group membership of the linux user. It must be a simple indexed array what contains the groups in what the user will be member. The groups must exist.
+	//'nogroup'		=> true,		// Optional. If true the Primary group will not be created. If 'gid' is present this parameter will be ineffective.
+	'comment'		=> 'test user',	// Optional. Comment (display name) of linux user.
+	//'home'		=> '/home/test',// Optional. Absolute path of Home directory of linux user.
+	//'createhome'	=> true,		// Optional. If false the Home directory will not be created.
+	//'shell'		=> '/bin/bash',	// Optional. Absolute path of shell for linux user.
+	//'inactive'	=> 90,			// Optional. The number of days after password expires that account is disabled.
+	//'expire'		=> 1640995199,	// Optional. Date when account will be disabled. Format: timestamp.
+	//'system'		=> true,		// Optional. If true create a system account. User ID will be under 1000. If 'uid' is present this parameter will be ineffective.
+	//'nonunique'	=> true	,		// Optional. If true allow to create users with duplicate (non-unique) User ID.
 	
 	] ) )
 	
@@ -48,9 +48,9 @@ else
 if ( ! lnxAddGroup( [
 	
 	'name'			=> $group,		// Mantandory! Name of linux group.
-	//'gid'			=> 1011,			// Optional. Group ID of linux group. The ID must not exist!
-	//'system'		=> true,			// Optional. If true create a system group. Group ID will be under 1000. If 'gid' is present this parameter will be ineffective.
-	//'nonunique'	=> true,			// Optional. If true allow to create groups with duplicate (non-unique) Group ID
+	//'gid'			=> 1011,		// Optional. Group ID of linux group. The ID must not exist!
+	//'system'		=> true,		// Optional. If true create a system group. Group ID will be under 1000. If 'gid' is present this parameter will be ineffective.
+	//'nonunique'	=> true,		// Optional. If true allow to create groups with duplicate (non-unique) Group ID
 
 	] ) )
 	
@@ -60,25 +60,25 @@ else
 	
 	print( "'$group' group is created." . PHP_EOL );
 
-# Examine user is if exists
+# Examine if user exists
 
 if ( lnxExistsUser( $user ) )
 	
-	print( "'$user' user is exists!" . PHP_EOL );
+	print( "'$user' user exists!" . PHP_EOL );
 
 else
 	
-	print( "'$user' user is not exists!" . PHP_EOL );
+	print( "'$user' user does not exists!" . PHP_EOL );
 
-# Examine group is if exists
+# Examine if group exists
 
 if ( lnxExistsGroup( $group ) )
 	
-	print( "'$group' group is exists!" . PHP_EOL );
+	print( "'$group' group exists!" . PHP_EOL );
 
 else
 	
-	print( "'$group' group is not exists!" . PHP_EOL );
+	print( "'$group' group does not exists!" . PHP_EOL );
 
 # Modify linux user
 
@@ -125,7 +125,7 @@ else
 	
 	print( "'$group' group is modified." . PHP_EOL );
 
-# Get user's information
+# Query information about the linux user
 
 print( "Information of '$user' user:" . PHP_EOL );
 
@@ -147,7 +147,7 @@ if ( lnxExistsUser( $user ) )
 
 	}
 
-# Get group's information
+# Query information about the linux group
 
 print( "Information of '$group' group:" . PHP_EOL );
 
@@ -179,7 +179,7 @@ else
 	
 	print( "'$user' user authentication is failed!" . PHP_EOL );
 
-# Examine user is if in the group
+# Examine if user is a member of the group
 
 if ( lnxIsMember( $user, $group ) )
 

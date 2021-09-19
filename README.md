@@ -1,5 +1,7 @@
 # lnxUser PHP class
 
+Linux user and group management in PHP.
+
 Basically this library a php interface of useradd, groupadd, usermod, groupmod, userdel, groupdel, mkpasswd linux commands. You can manage easily the linux users and groups with this library from a php apllication.
 
 # Requirements
@@ -22,7 +24,7 @@ Tested on Ubuntu with **PHP 7.0 - 8.1** versions.
 
 # Documentation
 
-browse lnxUser.doc.html
+browse [Documentation](https://doc.onlinesoft.org/index.php?title=LnxUser_PHP_Class_Reference)
 
 # Usage
 

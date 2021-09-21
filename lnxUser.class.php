@@ -5,14 +5,15 @@
  * @author moszat <moszat@onlinesoft.org>
  * @copyright 2021 moszat
  * @license GPL 3
- * @version 1.00
+ * @version 1.1
  * 
  * See the https://doc.onlinesoft.org/index.php?title=LnxUser_PHP_Class_Reference for the documentation. 
  */
 
-define( 'LNX_PH_MD5',		'md5' );
-define( 'LNX_PH_SHA256',	'sha-256' );
-define( 'LNX_PH_SHA512',	'sha-512' );
+define( 'LNX_PH_DES',		'DES' );
+define( 'LNX_PH_MD5',		'MD5' );
+define( 'LNX_PH_SHA256',	'SHA256' );
+define( 'LNX_PH_SHA512',	'SHA512' );
 
 class lnxUser 
 {
@@ -24,17 +25,20 @@ class lnxUser
 	 * @var array $usersByID
 	 * @var array $groups
 	 * @var array $groupsByID
+	 * @var string $defaultPasswordHash 
 	 */
 	private	$users;
 	private	$usersByID;
 	private	$groups;
 	private	$groupsByID;
+	private $defaultPasswordHash = '';
 
 	/**
 	 * Load (or reload) information of user and group from linux system files to system vars
 	 */
 	function __construct()
 	{
+		global $lnxDefaultPasswordHash;
 
 		$passwd			    = preg_split( "/((\r?\n)|(\r\n?))/", file_get_contents('/etc/passwd' ) );
 		$shadow			    = preg_split( "/((\r?\n)|(\r\n?))/", file_get_contents('/etc/shadow' ) );
@@ -100,8 +104,11 @@ class lnxUser
 				$this->users[$user['name']]['groups'][] = $this->groupsByID[$user['gid']];
 			}
 
-	}
+		if ( empty( $this->defaultPasswordHash ) )
+			$this->setDefaultPasswordHash( $lnxDefaultPasswordHash );
 
+	}
+	
 	/**
 	 * Examine that the linux user is exists.
 	 *
@@ -485,7 +492,7 @@ class lnxUser
 	 * @param string $password
 	 * @return boolean
 	 */
-	public function authUser( $user, $password ):bool
+	public function authUser( $user, string $password ):bool
 	{
 
 		if ( !$this->existsUser( $user ) )											return false;
@@ -494,7 +501,6 @@ class lnxUser
 			|| substr( $this->users[$user]['password'], 0, 1 ) == '!'
 		)																			return false;
 
-		$password	= (string)$password;
 		$pass		= explode( '$', $this->users[$user]['password'] );
 		$salt		= $pass[2];
 		switch ( $pass[1] ) {
@@ -512,9 +518,17 @@ class lnxUser
 				return false;
 		}
 
-		return $this->users[$user]['password'] == trim(`mkpasswd -m $hash $password $salt`);
+		$auth = $this->users[$user]['password'] == $this->getPassHash( $password, $salt, $hash );
+		openlog('lnxUser', LOG_PID, LOG_AUTHPRIV );
+		if ( $auth ) 
+			syslog(LOG_NOTICE, "Authentication success for user '$user'");
+		else
+			syslog(LOG_ERR, "Authentication failure for user '$user'");
+		closelog();
 
-		}
+		return $auth;
+
+	}
 
 	/**
 	 * Determines if a linux user is member of a group.
@@ -545,12 +559,12 @@ class lnxUser
 	 * @param string $hash
 	 * @return string
 	 */
-	public function getPassHash( $password, $salt = '', $hash = LNX_PH_SHA512 ):string
+	public function getPassHash( string $password, string $salt = '', string $hash = '' ):string
 	{
 
-		$password	= (string)addslashes($password);
-		$salt		= (string)$salt;
-		$hash		= strtolower( $hash );
+		$password	= addslashes($password);
+		if ( empty( $hash ) )
+			$hash = $this->defaultPasswordHash;
 
 		if ( ! in_array( $hash, [ LNX_PH_MD5, LNX_PH_SHA256, LNX_PH_SHA512 ] ) ) {
 			trigger_error ("Unknown hash method type: $hash!", E_USER_WARNING);
@@ -561,14 +575,61 @@ class lnxUser
 				trigger_error ("Salt is not alphanumeric!", E_USER_WARNING);
 				return '';
 			}
-			if ( strlen( $salt ) < 8 || strlen( $salt ) > 16 ) {
-				trigger_error ("Salt length must be between 8 and 16 characters!", E_USER_WARNING);
-				return '';
-			}
+		} else 
+			$salt = substr(str_shuffle('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 8);
+		switch ( $hash ) {
+			case LNX_PH_MD5:
+				if ( strlen( $salt ) < 4 || strlen( $salt ) > 8 ) {
+					trigger_error ("Salt length must be between 4 and 8 characters!", E_USER_WARNING);
+					return '';
+				}
+				$retVal = crypt($password, '$1$'.$salt);
+			break;
+			case LNX_PH_SHA256:
+				if ( strlen( $salt ) < 8 || strlen( $salt ) > 16 ) {
+					trigger_error ("Salt length must be between 8 and 16 characters!", E_USER_WARNING);
+					return '';
+				}
+				$retVal = crypt($password, '$5$'.$salt);
+			break;
+			case LNX_PH_SHA512:
+				if ( strlen( $salt ) < 8 || strlen( $salt ) > 16 ) {
+					trigger_error ("Salt length must be between 8 and 16 characters!", E_USER_WARNING);
+					return '';
+				}
+				$retVal = crypt($password, '$6$'.$salt);
+			break;
 		}
+		
+		return $retVal;
 
-		return preg_replace( "/\r|\n/", "",shell_exec("mkpasswd -m $hash \"$password\" $salt"));
+	}
 
+	/**
+	 * Set default password hash
+	 *
+	 * @param string $hash
+	 * @return boolean
+	 */
+	public function setDefaultPasswordHash( string $hash )
+	{
+		if ( ! in_array( $hash, [ LNX_PH_MD5, LNX_PH_SHA256, LNX_PH_SHA512 ] ) ) {
+			trigger_error ("Unknown hash method type $hash!", E_USER_WARNING);
+			return false;
+		} else {
+			$this->defaultPasswordHash = $hash;
+			return true;
+		}
+	}
+
+	/**
+	 * Get default password hash
+	 *
+	 * @return string
+	 */
+	public function getDefaultPasswordHash()
+	{
+		return $this->defaultPasswordHash;
 	}
 
 }
@@ -595,32 +656,61 @@ function lnxStaticHandle()
 /**
  * Static functions
  */
-function lnxExistsUser( $user ):bool											{ return lnxStaticHandle( 'existsUser',		$user ); }
-function lnxExistsGroup( $group ):bool											{ return lnxStaticHandle( 'existsGroup',	$group ); }
-function lnxGetUser( $user ):array												{ return lnxStaticHandle( 'getUser',		$user ); }
-function lnxgetGroup( $group ):array											{ return lnxStaticHandle( 'getGroup',		$group ); }
-function lnxAddUser( array $user ):bool											{ return lnxStaticHandle( 'addUser',		$user ); }
-function lnxAddGroup( array $group ):bool										{ return lnxStaticHandle( 'addGroup',		$group ); }
-function lnxModifyUser( array $user ):bool										{ return lnxStaticHandle( 'modifyUser',		$user ); }
-function lnxModifyGroup( array $group ):bool									{ return lnxStaticHandle( 'modifyGroup',	$group ); }
-function lnxDeleteUser( $user ):bool											{ return lnxStaticHandle( 'deleteUser',		$user ); }
-function lnxDeleteGroup( $group ):bool											{ return lnxStaticHandle( 'deleteGroup',	$group ); }
-function lnxAuthUser( $user, $pass ):bool										{ return lnxStaticHandle( 'authUser',		$user, $pass ); }
-function lnxIsMember ( $user, $group ):bool										{ return lnxStaticHandle( 'isMember',		$user, $group ); }
-function lnxGetPassHash( $password, $salt = '', $hash = LNX_PH_SHA512 ):string	{ return lnxStaticHandle( 'getPassHash',	$password, $salt, $hash ); }
+function lnxExistsUser( $user )													{ return lnxStaticHandle( 'existsUser',				$user ); }
+function lnxExistsGroup( $group )												{ return lnxStaticHandle( 'existsGroup',			$group ); }
+function lnxGetUser( $user )													{ return lnxStaticHandle( 'getUser',				$user ); }
+function lnxgetGroup( $group )													{ return lnxStaticHandle( 'getGroup',				$group ); }
+function lnxAddUser( array $user )												{ return lnxStaticHandle( 'addUser',				$user ); }
+function lnxAddGroup( array $group )											{ return lnxStaticHandle( 'addGroup',				$group ); }
+function lnxModifyUser( array $user )											{ return lnxStaticHandle( 'modifyUser',				$user ); }
+function lnxModifyGroup( array $group )											{ return lnxStaticHandle( 'modifyGroup',			$group ); }
+function lnxDeleteUser( $user )													{ return lnxStaticHandle( 'deleteUser',				$user ); }
+function lnxDeleteGroup( $group )												{ return lnxStaticHandle( 'deleteGroup',			$group ); }
+function lnxAuthUser( $user, string $pass )										{ return lnxStaticHandle( 'authUser',				$user, $pass ); }
+function lnxIsMember ( $user, $group )											{ return lnxStaticHandle( 'isMember',				$user, $group ); }
+function lnxGetPassHash( string $password, string $salt = '', string $hash ='' ){ return lnxStaticHandle( 'getPassHash',			$password, $salt, $hash ); }
+function lnxSetDefaultPasswordHash( string $hash )								{ return lnxStaticHandle( 'setDefaultPasswordHash',	$hash ); }
+function lnxGetDefaultPasswordHash()											{ return lnxStaticHandle( 'getDefaultPasswordHash'	); }
 
 /**
  * Verify requirements
  */
-if ( !empty( trim( `if ! test -f /bin/mkpasswd; then echo 'error'; fi` ) ) )
-	throw new ErrorException('mkpassword command not found!');
+function lnxCheckRequirements () {
+	global $lnxDefaultPasswordHash;
 
-if	(
-	!is_readable( '/etc/passwd' )
-||	!is_readable( '/etc/shadow' )
-||	!is_readable( '/etc/group' )
-	)
-	throw new ErrorException ('System files are not readable! ( /etc/passwd , /etc/shadow, /etc/group ) Are you root?');
+	// Is linux system files readable?
 
-if ( !function_exists( 'shell_exec' ) )
-	throw new ErrorException ('shell_exec function is not enabled!');
+	if	(
+		!is_readable( '/etc/passwd' )
+	||	!is_readable( '/etc/shadow' )
+	||	!is_readable( '/etc/group' )
+		)
+		throw new ErrorException ('System files are not readable! ( /etc/passwd , /etc/shadow, /etc/group ) Are you root?');
+
+	// Is shell_exec function enabled?
+
+	if ( !function_exists( 'shell_exec' ) )
+		throw new ErrorException ('shell_exec function is not enabled!');
+
+	// Get system default password hash method
+
+	$loginConfigFile = '/etc/login.defs';
+	if	( is_readable( $loginConfigFile ) ) {
+		$t_array = preg_grep( "/^ENCRYPT_METHOD .*$/", file( $loginConfigFile, FILE_IGNORE_NEW_LINES) );
+		if ( count ($t_array) != 1 )
+			trigger_error ("$loginConfigFile parse error!", E_USER_WARNING);
+		else {
+			$t_array = preg_split('/\s+/', $t_array[ array_key_first( $t_array ) ] );
+			$hash =  $t_array[1];
+			if ( ! in_array( $hash, [ LNX_PH_MD5, LNX_PH_SHA256, LNX_PH_SHA512 ] ) )
+				trigger_error ("Unknown ENCRYPT_METHOD $hash in $loginConfigFile", E_USER_WARNING);
+			else
+				$lnxDefaultPasswordHash = $hash;
+		}
+	} else 
+		trigger_error ("$loginConfigFile is not readable!", E_USER_WARNING);
+
+}
+
+$lnxDefaultPasswordHash = LNX_PH_SHA512;
+lnxCheckRequirements ();

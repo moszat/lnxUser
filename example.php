@@ -5,7 +5,7 @@
  * @author moszat <moszat@onlinesoft.org>
  * @copyright 2021 moszat
  * @license GPL 3
- * @version 1.00
+ * @version 1.1
  * 
  * See the https://doc.onlinesoft.org/index.php?title=LnxUser_PHP_Class_Reference for the documentation. 
  */
